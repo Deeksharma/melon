@@ -2,49 +2,25 @@ package main
 
 import (
 	"errors"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"io"
 	"log"
+	"melon/internal/service"
 	"net/http"
-	"sync"
-
-	"github.com/gin-gonic/gin"
 )
 
-var store = struct {
-	sync.RWMutex
-	m map[string]string
-}{m: make(map[string]string)}
-
-func Put(key string, value string) error {
-	store.Lock()
-	store.m[key] = value
-	store.Unlock()
-	return nil
-}
-
-var ErrorNoSuchKey = errors.New("no such key") // sentinel error
-
-func Get(key string) (string, error) {
-	store.RLock()
-	value, ok := store.m[key]
-	store.RUnlock()
-	if !ok {
-		return "", ErrorNoSuchKey
-	}
-	return value, nil
-}
-
-func Delete(key string) error {
-	store.Lock()
-	delete(store.m, key)
-	store.Unlock()
-	return nil
-}
-
-func helloMuxHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hello gorilla/mux!\n"))
-}
 func main() {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	err := service.InitializeTransactionLog()
+	if err != nil {
+		logger.Info("error initializing the transaction logger",
+			zap.String("err", err.Error()),
+		)
+		return
+	}
 	r := gin.Default() // mux router implements the Handler interface
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -74,11 +50,12 @@ func keyValuePutHandler(c *gin.Context) {
 		return
 	}
 
-	err = Put(key, string(value))
+	err = service.Put(key, string(value))
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+	service.WritePut(key, string(value))
 	c.JSON(http.StatusCreated, map[string]interface{}{
 		"status": "created",
 	})
@@ -86,8 +63,8 @@ func keyValuePutHandler(c *gin.Context) {
 
 func keyValueGetHandler(c *gin.Context) {
 	key := c.Param("key")
-	value, err := Get(key) // Get value for key
-	if errors.Is(err, ErrorNoSuchKey) {
+	value, err := service.Get(key) // Get value for key
+	if errors.Is(err, service.ErrorNoSuchKey) {
 		c.AbortWithStatusJSON(http.StatusNotFound, map[string]string{"error": err.Error()})
 		return
 	}
@@ -101,9 +78,10 @@ func keyValueGetHandler(c *gin.Context) {
 
 func keyValueDeleteHandler(c *gin.Context) {
 	key := c.Param("key")
-	err := Delete(key)
+	err := service.Delete(key)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+	service.WriteDelete(key)
 }

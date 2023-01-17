@@ -1,0 +1,6 @@
+create_table("transactions") {
+  t.Column("id", "integer", {primary:true})
+  t.Column("event_type", "integer", {"default":0})
+  t.Column("key", "string", {})
+  t.Column("value", "string", {})
+}
