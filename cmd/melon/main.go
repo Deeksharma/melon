@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"io"
@@ -36,11 +37,16 @@ func main() {
 	r.PUT("/v1/key/:key", keyValuePutHandler)
 	r.GET("/v1/key/:key", keyValueGetHandler)
 	r.DELETE("/v1/key/:key/", keyValueDeleteHandler)
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServeTLS(":8080", "./deeksha-cert.pem", "./deeksha-key.pem", r))
 }
 
 // keyValuePutHandler expects to be called with a PUT request for // the "/v1/key/{key}" resource.
 func keyValuePutHandler(c *gin.Context) {
+	if c.Request.TLS != nil {
+		fmt.Println("Certificate used by server:")
+		state := c.Request.TLS.ServerName
+		fmt.Println("tls server name", state)
+	}
 	key := c.Param("key")
 
 	value, err := io.ReadAll(c.Request.Body)

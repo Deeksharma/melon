@@ -9,23 +9,17 @@ var logger transaction.TransactionLogger
 
 func InitializeTransactionLog() error {
 	var err error
-	//logger, err = transaction.NewFileTransactionLogger("transaction.log")
-	logger, err = transaction.NewPostgresTransactionLogger(transaction.PostgresDBParams{
-		Host:     "localhost",
-		DbName:   "melon",
-		Port:     "5432",
-		User:     "deekshasharma",
-		Password: "",
-	}) // TODO test it by runnin postgers
+	logger, err = transaction.NewFileTransactionLogger("transaction.log")
+	// logger, err = NewPostgresTransactionLogger("localhost") // TODO test it by runnin postgeryy
 	if err != nil {
 		return fmt.Errorf("failed to create event logger: %w", err)
 	}
+
 	events, errors := logger.ReadEvents()
 	e, ok := transaction.Event{}, true
 	for ok && err == nil {
 		select {
 		case err, ok = <-errors:
-			fmt.Println(err)
 		case e, ok = <-events:
 			switch e.EventType {
 			case transaction.EventDelete:
